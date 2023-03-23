@@ -8,6 +8,7 @@ const {
     HANDLERS
 } = require('../config');
 var handler = HANDLERS !== 'false'?HANDLERS.split("")[0]:"";
+var badwordsRegExp = require('badwords/regexp');
 const {
     getString
 } = require('./misc/lang');
@@ -100,7 +101,7 @@ Module({
         waveform: Array.from({length: 40}, () => Math.floor(Math.random() * 99))
     }, {
         quoted: message.data
-    });
+    }); 
 });
 Module({
     pattern: 'img ?(.*)',
@@ -111,11 +112,15 @@ Module({
     if (!match[1]) return await message.sendReply(Lang.NEED_WORD);
     var count = parseInt(match[1].split(",")[1]) || 5
     var query = match[1].split(",")[0] || match[1];
+    if (badwordsRegExp.test(query)) return await message.sendReply(`_The word "${query.match(badwordsRegExp)}" is blocked!_`)
     const results = await gis(query);
         await message.sendReply(Lang.IMG.format(results.splice(0, count).length, query))
         for (var i = 0; i < (results.length < count ? results.length : count); i++) {
-         try { var buff = await skbuffer(results[i].url); } catch { var buff = await skbuffer("https://miro.medium.com/max/800/1*hFwwQAW45673VGKrMPE2qQ.png") }
-         await message.send(buff, 'image');
+         try { var buff = await skbuffer(results[i].url); } catch {
+		 count++
+	        var buff = false
+	 }
+         if (buff) await message.send(buff, 'image');
         }
 }));
 Module({
