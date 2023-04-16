@@ -16,6 +16,9 @@ const {
 } = require("raganork-bot");
 let w = "public" != MODE;
 const readMore = String.fromCharCode(8206).repeat(4001);
+function getCommands(){
+return commands.map(x=>x?.pattern?.toString().match(/(\W*)([A-Za-zğüşıiöç1234567890 ]*)/)[2].trim())
+}
 Module({
     pattern: "list ?(.*)",
     fromMe: w,
@@ -38,7 +41,7 @@ Module({
                     r = /\[(\W*)\]/.test(HANDLERS) ? HANDLERS.match(/\[(\W*)\]/)[1][0] : ".", "" == n.desc && "" == !n.usage && "" == n.warn && (e += (a.length >= 3 ? r + mmatch : n.pattern) + "\n" + "Example" + ": " + n.usage + "\n\n"), "" == !n.desc && "" == n.usage && "" == n.warn && (e += (a.length >= 3 ? r + mmatch : n.pattern) + "\n" + n.desc + " \n\n"), "" == n.desc && "" == n.usage && "" == !n.warn && (e += (a.length >= 3 ? r + mmatch : n.pattern) + "\n" + n.warn + "\n\n"), "" == !n.desc && "" == !n.usage && "" == n.warn && (e += (a.length >= 3 ? r + mmatch : n.pattern) + "\n" + n.desc + " \n" + "Example" + ": " + n.usage + "\n\n"), "" == !n.desc && "" == n.usage && "" == !n.warn && (e += (a.length >= 3 ? r + mmatch : n.pattern) + "\n" + n.desc + " \n" + "Warning" + ": " + n.warn + "\n\n"), "" == n.desc && "" == !n.usage && "" == !n.warn && (e += (a.length >= 3 ? r + mmatch : n.pattern) + "\n" + n.usage + "\n" + "Warning" + ": " + n.warn + "\n\n"), "" == n.desc && "" == n.usage && "" == n.warn && (e += (a.length >= 3 ? r + mmatch : n.pattern) + "\n\n"), "" == !n.desc && "" == !n.usage && "" == !n.warn && (e += (a.length >= 3 ? r + mmatch : n.pattern) + "\n" + n.desc + " \n" + "Example" + ": " + n.usage + "\n" + "Warning" + ": " + n.warn + "\n\n")
                 }
             }
-        }), "" === e && (e += "Command not found"), await n.sendReply("```Commands list```" + readMore + e)
+        }), "" === e && (e += "Command not found"), await n.sendReply("_"+e.trim()+"_")
     } else {
         commands.map(async n => {
             if (!n.dontAddCommandList && void 0 !== n.pattern) {
@@ -56,4 +59,4 @@ Module({
         await n.sendReply(t)
     }
 });
-
+module.exports = {getCommands};

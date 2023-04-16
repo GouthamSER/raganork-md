@@ -30,6 +30,8 @@ async function sendButton(buttons,text,footer,message){
     } = require('./misc/misc');
     const Config = require('../config');
     const config = require('../config');
+    const {getCommands} = require('./commands');
+    const {HEROKU} = require('../config');
     const Heroku = require('heroku-client');
     const fs = require('fs');
     const got = require('got');
@@ -40,7 +42,81 @@ async function sendButton(buttons,text,footer,message){
     const heroku = new Heroku({
         token: Config.HEROKU.API_KEY
     });
+    let baseURI = '/apps/' + Config.HEROKU.APP_NAME;
     var handler = Config.HANDLERS !== 'false'?Config.HANDLERS.split("")[0]:""
+        async function fixHerokuAppName(message){
+            if (!HEROKU.API_KEY) return await message.sendReply(`_You have not provided HEROKU_API_KEY\n\nPlease fill this var, get api key from heroku account settings_`)
+            let apps = await heroku.get('/apps')
+            let app_names = apps.map(e=>e.name)
+            if (!HEROKU.APP_NAME || !app_names.includes(Config.HEROKU.APP_NAME)){
+            function findGreatestNumber(e){let t=e[0];for(let n=1;n<e.length;n++)e[n]>t&&(t=e[n]);return t}
+            let times = apps.map(e=>new Date(e.updated_at).getTime())
+            let latest = findGreatestNumber(times)
+            let index = times.indexOf(latest)
+            let app_name = apps[index].name
+            Config.HEROKU.APP_NAME = app_name
+            process.env.HEROKU_APP_NAME = app_name
+            baseURI = '/apps/' + app_name;
+            await message.sendReply(`_You provided an incorrect heroku app name, and I have corrected your app name to "${app_name}"_\n\n_Please retry this command after restart!_`)    
+            Config.HEROKU.APP_NAME = app_name
+                return await setVar("HEROKU_APP_NAME",app_name,message)
+            }
+        }
+        async function setVar(key,value,message){
+        key = key.toUpperCase().trim()
+        value = value.trim()
+        let setvarAction = isHeroku ? "restarting" : isVPS ? "rebooting" : "redeploying";
+        var set_ = `_Successfully set ${key} to ${value}, {}.._`;
+        set_ = key == "ANTI_BOT" ? `AntiBot activated, bots will be automatically kicked, {}` : key == "ANTI_SPAM" ? `AntiSpam activated, spammers will be automatically kicked, {}` : key == "MODE" ? `Mode switched to ${value}, {}`:set_;
+        set_ = set_.format(setvarAction)
+        let m = message;
+        if (isHeroku) {
+            await fixHerokuAppName(message)
+            await heroku.patch(baseURI + '/config-vars', {
+                body: {
+                    [key]: value
+                }
+            }).then(async (app) => {
+                if (message){
+                return await message.sendReply(set_)
+                }
+            });
+        }
+        if (isVPS){
+        try { 
+        var envFile = fs.readFileSync(`./config.env`,'utf-8')
+        const lines = envFile.trim().split('\n');
+        let found = false;
+        for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.startsWith(`${key}=`)) {
+            // If the line matches the variable name, replace the value
+            lines[i] = `${key}="${value}"`;
+            found = true;
+            break;
+        }
+        }
+        if (!found) {
+        lines.push(`${key}="${value}"`);
+        }
+fs.writeFileSync('./config.env', lines.join('\n'));
+        if (message){
+        await m.sendReply(set_)
+        }
+        if (key == "SESSION"){
+        await require('fs-extra').removeSync('./baileys_auth_info'); 
+        }
+        process.exit(0)    
+    } catch(e){
+        if (message) return await m.sendReply("_Are you a VPS user? Check out wiki for more._\n"+e.message);
+        }
+        } 
+        if (__dirname.startsWith("/rgnk")) {
+            let set_res = await update(key,value)
+            if (set_res && message) return await m.sendReply(set_)
+            else throw "Error!"
+        }   
+    }
     function secondsToDhms(seconds) {
         seconds = Number(seconds);
         var d = Math.floor(seconds / (3600*24));
@@ -54,7 +130,6 @@ async function sendButton(buttons,text,footer,message){
         var sDisplay = s > 0 ? s + (s == 1 ? " second" : " seconds") : "";
         return dDisplay + hDisplay + mDisplay + sDisplay;
         }
-    let baseURI = '/apps/' + Config.HEROKU.APP_NAME;
     Module({
         pattern: 'restart$',
         fromMe: true,
@@ -62,6 +137,7 @@ async function sendButton(buttons,text,footer,message){
         use: 'owner'
     }, (async (message, match) => {
         if (!isHeroku) return await message.sendReply("_This is a heroku command, but this bot is not running on heroku!_");
+        await fixHerokuAppName(message)
         await message.sendReply(Lang.RESTART_MSG)
         await heroku.delete(baseURI + '/dynos').catch(async (error) => {
             await message.send(error.message)
@@ -76,6 +152,7 @@ async function sendButton(buttons,text,footer,message){
         if (isVPS){
             return await pm2.stop("Raganork");
         } else if (isHeroku){
+            await fixHerokuAppName(message)
             await heroku.get(baseURI + '/formation').then(async (formation) => {
             forID = formation[0].id;
             await message.sendReply(Lang.SHUTDOWN_MSG)
@@ -96,6 +173,7 @@ async function sendButton(buttons,text,footer,message){
         use: 'owner'
     }, (async (message, match) => {
         if (!isHeroku) return await message.sendReply("_This is a heroku command, but this bot is not running on heroku!_");
+        await fixHerokuAppName(message)
         heroku.get('/account').then(async (account) => {
             url = "https://api.heroku.com/accounts/" + account.id + "/actions/get-quota"
             headers = {
@@ -112,10 +190,10 @@ async function sendButton(buttons,text,footer,message){
                 percentage = Math.round((quota_used / total_quota) * 100);
                 remaining = total_quota - quota_used;
                 await message.sendReply(
-                    "_Total: *{}*_\n".format(secondsToDhms(total_quota)) +
+                    "_Total: *{}*_\n".format(secondsToDhms(total_quota).trim()) +
                     "_Used: *{}*_\n".format(secondsToDhms(quota_used)) +
                     "_Percent: *{}*_\n".format(percentage) +
-                    "_Remaining: *{}*_\n".format(secondsToDhms(remaining)))
+                    "_Remaining: *{}*_\n".format(secondsToDhms(remaining).trim()))
     
             }).catch(async (err) => {
                 await message.send(error.message)
@@ -131,34 +209,11 @@ async function sendButton(buttons,text,footer,message){
         match=match[1]
         var m = message;
         if (!match) return await m.sendReply("_Need params!_\n_Eg: .setvar MODE:public_")
-        let key = match.split(":")[0]
-        let value =match.replace(key+":","").replace(/\n/g, '\\n')
-        if (isHeroku) return await message.sendReply("_Command currently unavailable for heroku_");
+        let [key, ...valueArr] = match.split(':');
+        let value = valueArr.join(':');
         config[key] = value
-        if (isVPS){
-        try { 
-        var envFile = fs.readFileSync(`./config.env`).toString('utf-8')
-        let matches = envFile.split('\n').filter(e=>e.startsWith(key))
-        if (matches.length==1){
-            let newEnv = envFile.replace(matches[0].split('=')[1],config[key])
-            await fs.writeFileSync(`./config.env`,newEnv)
-        } else {
-            let newEnv = envFile+'\n'+key+'='+config[key]
-            await fs.writeFileSync(`./config.env`,newEnv)
-        }
-        await m.sendReply(`_Successfully set ${key} to ${config[key]}, rebooting._`)
-        if (key == "SESSION"){
-        await require('fs-extra').removeSync('./baileys_auth_info'); 
-        }
-        process.exit(0)    
-    } catch(e){
-            return await m.sendReply("_Are you a VPS user? Check out wiki for more._\n"+e.message);
-        }
-        } else {
-            let set_res = await update(key,value)
-            if (set_res) return await m.sendReply(`_Successfully set ${key} to ${value}, redeploying._`)
-            else throw "Error!"
-        }   
+        return await setVar(key,value,message)
+        
     }));
     
     Module({
@@ -168,6 +223,7 @@ async function sendButton(buttons,text,footer,message){
         use: 'owner'
     }, (async (message, match) => {
         if (!isHeroku) return await message.sendReply("_This is a heroku command, but this bot is not running on heroku!_");
+        await fixHerokuAppName(message)
         if (match[1] === '') return await message.sendReply(Lang.NOT_FOUND)
         await heroku.get(baseURI + '/config-vars').then(async (vars) => {
             key = match[1].trim();
@@ -194,7 +250,7 @@ async function sendButton(buttons,text,footer,message){
         use: 'owner'
     }, (async (message, match) => {
         if (match[1] === '') return await message.sendReply(Lang.NOT_FOUND)
-        return await message.sendReply(config[match[1].trim()]?.toString() || "Not found")
+        return await message.sendReply(process.env[match[1].trim()]?.toString() || "Not found")
    }));
     Module({
             pattern: "allvar",
@@ -207,6 +263,7 @@ async function sendButton(buttons,text,footer,message){
                 return await message.sendReply(fs.readFileSync(`./config.env`).toString('utf-8'));
             }
             if (!isHeroku) return await message.sendReply("_This is a heroku command, but this bot is not running on heroku!_");
+            await fixHerokuAppName(message)
             let msg = Lang.ALL_VARS + "\n\n\n```"
             await heroku
                 .get(baseURI + "/config-vars")
@@ -281,12 +338,57 @@ async function sendButton(buttons,text,footer,message){
         desc: "Change bot mode to public & private",
         use: 'config'
     }, (async (message, match) => {
-        const buttons = [
-            {buttonId: handler+'setvar MODE:public', buttonText: {displayText: 'PUBLIC'}, type: 1},
-            {buttonId: handler+'setvar MODE:private', buttonText: {displayText: 'PRIVATE'}, type: 1}
-        ]
-        return await sendButton(buttons,"*Mode switcher*","Current mode: "+Config.MODE,message)
+        if (match[1]?.toLowerCase() == "public" || match[1]?.toLowerCase() == "private"){
+            return await setVar("MODE",match[1],message)
+        } else {
+            return await message.sendReply(`_*Mode manager*_\n_Current mode: ${config.MODE}_\n_Use .mode public/private_`)
+        }
     }));
+    Module({
+        pattern: 'setsudo ?(.*)',
+        fromMe: true,
+        use: 'owner'
+    }, (async (message, mm) => {
+   var m = message;
+        var newSudo = ( m.reply_message ? m.reply_message.jid : '' || m.mention[0] || match[1]).split("@")[0]
+if (!newSudo) return await m.sendReply("*Need reply/mention/number*")
+const oldSudo = config.SUDO?.split(",")
+    var newSudo = ( m.reply_message ? m.reply_message.jid : '' || m.mention[0] || mm[1]).split("@")[0]
+    if (!newSudo) return await m.sendReply("*Need reply/mention/number*")
+    newSudo = newSudo.replace(/[^0-9]/g, '');
+    if (!oldSudo.includes(newSudo)) {
+    oldSudo.push(newSudo)
+    var setSudo = oldSudo
+    setSudo = setSudo.map(x => {
+        if (typeof x === 'number') {
+          return x.toString();
+        } else {
+          return x.replace(/[^0-9]/g, '');
+        }
+      }).join(',')
+    await m.client.sendMessage(m.jid,{text:'_Added @'+newSudo+' as sudo_',mentions:[newSudo+"@s.whatsapp.net"]})
+    await setVar("SUDO",setSudo,m)
+    } else return await m.sendReply("_User is already a sudo_")
+}));
+    Module({
+        pattern: 'getsudo ?(.*)',
+        fromMe: true,
+        use: 'owner'
+    }, (async (message, match) => {
+    return await message.sendReply(config.SUDO);
+    }));
+    Module({pattern: 'delsudo ?(.*)', fromMe: true, desc: "Deletes sudo"}, (async (m,mm) => { 
+    const oldSudo = config.SUDO?.split(",")
+    var newSudo = ( m.reply_message ? m.reply_message.jid : '' || m.mention[0] || mm[1]).split("@")[0]
+    if (!newSudo) return await m.sendReply("*Need reply/mention/number*")
+    if (oldSudo.includes(newSudo)) {
+    oldSudo.push(newSudo)
+    var setSudo = oldSudo
+    setSudo = setSudo.filter(x=>x!==newSudo.replace(/[^0-9]/g, '')).join(',')
+    await m.client.sendMessage(m.jid,{text:'_Removed @'+newSudo+' from sudo!_',mentions:[newSudo+"@s.whatsapp.net"]})
+    await setVar("SUDO",setSudo,m)
+    } else return await m.sendReply("_User is already not a sudo_")
+}));
     Module({
         pattern: 'antispam ?(.*)',
         fromMe: true,
@@ -295,8 +397,8 @@ async function sendButton(buttons,text,footer,message){
     }, (async (message, match) => {
         var admin = await isAdmin(message)
         if (!admin) return await message.sendReply("_I'm not admin_");
-        var Jids = Config.ANTI_SPAM?.split(',') || []
-        var msg = Config.ANTI_SPAM;
+        var Jids = process.env.ANTI_SPAM?.split(',') || []
+        var msg = process.env.ANTI_SPAM;
         var toggle = "on"
         var off_msg = Jids?.filter(e=>e!==message.jid) || 'false'
         if (!Jids.includes(message.jid)){
@@ -304,11 +406,35 @@ async function sendButton(buttons,text,footer,message){
             msg = Jids.join(",")
             toggle = "off"
         }
-        const buttons = [
-            {buttonId: handler+'setvar ANTI_SPAM:'+msg, buttonText: {displayText: 'ON'}, type: 1},
-            {buttonId: handler+'setvar ANTI_SPAM:'+off_msg, buttonText: {displayText: 'OFF'}, type: 1}
-        ]
-        return await sendButton(buttons,"*Antispam control panel*","Antispam is currently "+toggle,message)
+        if (match[1]?.toLowerCase() === 'on'){
+            return await setVar("ANTI_SPAM",msg,message)
+        }
+        if (match[1]?.toLowerCase() === 'off'){
+            return await setVar("ANTI_SPAM",off_msg,message)
+        }
+        return await message.sendReply("_Antispam mode_\n\n"+"_Current status: *"+toggle+"*\n\n_Use: .antispam on/off_")
+    }));
+    Module({
+        pattern: 'toggle ?(.*)',
+        fromMe: true,
+        desc: "To toggle commands on/off (enable/disable)",
+        usage: '.toggle img',
+        use: 'group'
+    }, (async (message, match) => {
+        var disabled = process.env.DISABLED_COMMANDS?.split(',') || []
+        match = match[1]
+        const commands = getCommands()
+        if (match){
+            if (!commands.includes(match.trim())) return await message.sendReply(`_${handler}${match.trim()} is not a valid command!_`)
+            if (!disabled.includes(match)){
+            disabled.push(match.trim())
+            await message.sendReply(`_Successfully turned off \`${handler}${match}\` command_\n_Use ${handler}toggle ${match} to enable this command back_`)
+            return await setVar("DISABLED_COMMANDS",disabled.join(','),false)
+                } else {
+                    await message.sendReply(`_Successfully turned on \`${handler}${match}\` command_`)
+                    return await setVar("DISABLED_COMMANDS",disabled.filter(x=>x!=match).join(','),false)
+                    }
+        } else return await message.sendReply(`_Example: ${handler}toggle img_\n\n_(This will disable .img command)_`)
     }));
     Module({
         pattern: 'antibot ?(.*)',
@@ -318,8 +444,8 @@ async function sendButton(buttons,text,footer,message){
     }, (async (message, match) => {
         var admin = await isAdmin(message)
         if (!admin) return await message.sendReply("_I'm not admin_");
-        var Jids = Config.ANTI_BOT?.split(',') || []
-        var msg = Config.ANTI_BOT;
+        var Jids = process.env.ANTI_BOT?.split(',') || []
+        var msg = process.env.ANTI_BOT;
         var toggle = "on"
         var off_msg = Jids?.filter(e=>e!==message.jid) || 'false'
         if (!Jids.includes(message.jid)){
@@ -327,11 +453,13 @@ async function sendButton(buttons,text,footer,message){
             msg = Jids.join(",")
             toggle = "off"
         }
-        const buttons = [
-            {buttonId: handler+'setvar ANTI_BOT:'+msg, buttonText: {displayText: 'ON'}, type: 1},
-            {buttonId: handler+'setvar ANTI_BOT:'+off_msg, buttonText: {displayText: 'OFF'}, type: 1}
-        ]
-        return await sendButton(buttons,"_Antibot mode_","Current status: "+toggle,message)
+        if (match[1]?.toLowerCase() === 'on'){
+            return await setVar("ANTI_BOT",msg,message)
+        }
+        if (match[1]?.toLowerCase() === 'off'){
+            return await setVar("ANTI_BOT",off_msg,message)
+        }
+        return await message.sendReply("_Antibot mode_\n\n"+"_Current status: *"+toggle+"*_\n\n_Use: .antibot on/off_")
     }));
     Module({
         pattern: 'antilink ?(.*)',
@@ -339,29 +467,26 @@ async function sendButton(buttons,text,footer,message){
         desc: "Activates antilink",
         use: 'config'
     }, (async (message, match) => {
+        match[1]=match[1]?match[1].toLowerCase():""
         var db = await getAntilink();
         const jids = []
         db.map(data => {
             jids.push(data.jid)
         });
-        if (match[1] === "button_on"){
+        if (match[1] === "on"){
             if (!(await isAdmin(message))) return await message.sendReply("_I'm not an admin!_")
             await setAntilink(message.jid) 
         }
-        if (match[1] === "button_off"){
+        if (match[1] === "off"){
             if (!(await isAdmin(message))) return await message.sendReply("_I'm not an admin!_")
             await delAntilink(message.jid)  
         }
-        if (match[1]!=="button_on" && match[1]!=="button_off"){
-        const buttons = [
-            {buttonId: handler+'antilink button_on', buttonText: {displayText: 'ON'}, type: 1},
-            {buttonId: handler+'antilink button_off', buttonText: {displayText: 'OFF'}, type: 1}
-        ]
+        if (match[1]!=="on" && match[1]!=="off"){
         var status = jids.includes(message.jid) ? 'on' : 'off';
         var {subject} = await message.client.groupMetadata(message.jid)
-        return await sendButton(buttons,`_Antilink menu of ${subject}_`,"_Antilink is currently turned "+status+"_",message)
+        return await message.sendReply(`_Antilink menu of ${subject}_`+"\n\n_Antilink is currently turned *"+status+"*_\n\n_Use .antilink on/off_")
         }
-        await message.sendReply(match[1] === "button_on" ? "_Antilink activated!_" : "_Antilink deactivated!_");
+        await message.sendReply(match[1] === "on" ? "_Antilink activated!_" : "_Antilink deactivated!_");
     }));
     Module({
         on: 'text',
@@ -392,3 +517,4 @@ async function sendButton(buttons,text,footer,message){
     }
     }));
     
+module.exports = {setVar,fixHerokuAppName}

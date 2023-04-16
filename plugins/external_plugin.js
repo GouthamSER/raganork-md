@@ -31,9 +31,8 @@ Module({
     } catch {
         return await message.send(Lang.INVALID_URL);
     }
-    if (url.host === 'gist.github.com') {
-        url.host = 'gist.githubusercontent.com';
-        url = url.toString() + '/raw'
+    if (url.host === 'gist.github.com' || url.host === 'gist.githubusercontent.com') {
+        url = !url?.toString().endsWith('raw')?url.toString() + '/raw':url.toString()
     } else {
         url = url.toString()
     }
@@ -46,6 +45,7 @@ Module({
     var plugin_name_temp = response.data.match(/pattern: ["'](.*)["'],/g)?response.data.match(/pattern: ["'](.*)["'],/g).map(e=>e.replace("pattern","").replace(/[^a-zA-Z]/g, "")):"temp"
     try { plugin_name = plugin_name[1].split(" ")[0] } catch { return await message.sendReply("_Invalid plugin. No plugin name found!_") }
     fs.writeFileSync('./plugins/' + plugin_name + '.js', response.data);
+    plugin_name_temp = plugin_name_temp.length > 1 ? plugin_name_temp.join(", ") : plugin_name;
     try {
         require('./' + plugin_name);
     } catch (e) {
@@ -53,7 +53,7 @@ Module({
         return await message.sendReply(Lang.INVALID_PLUGIN + e);
     }
     await Db.installPlugin(url, plugin_name);
-    await message.send(Lang.INSTALLED.format(plugin_name_temp.join(", ")));
+    await message.send(Lang.INSTALLED.format(plugin_name_temp));
 }
 }));
 
@@ -67,7 +67,7 @@ Module({
     if (match[1] !== '') {
         var plugin = plugins.filter(_plugin => _plugin.dataValues.name === match[1])
         try {
-            await message.sendReply(plugin.dataValues.name + ": " + plugin.dataValues.url);
+            await message.sendReply(`_${plugin[0].dataValues.name}:_ ${plugin[0].dataValues.url}`);
         } catch {
             return await message.sendReply(Lang.PLUGIN_NOT_FOUND)
         }
@@ -80,7 +80,7 @@ Module({
     } else {
         plugins.map(
             (plugin) => {
-                msg += '*' + plugin.dataValues.name + '* : ' + plugin.dataValues.url + '\n\n';
+                msg += '*' +plugin.dataValues.name + '* : ' +( plugin.dataValues.url.endsWith("/raw")?plugin.dataValues.url.replace('raw',''):plugin.dataValues.url) + '\n\n';
             }
         );
         return await message.sendReply(msg);
@@ -103,16 +103,9 @@ Module({
         return await message.send(Lang.NO_PLUGIN);
     } else {
         await plugin[0].destroy();
+        const Message = Lang.DELETED.format(match[1])
+        await message.sendReply(Message);
         delete require.cache[require.resolve('./' + match[1] + '.js')]
         fs.unlinkSync('./plugins/' + match[1] + '.js');
-    const buttons = [{buttonId: handler+'reboot', buttonText: {displayText: 'Restart'}, type: 1}]
-          
-          const buttonMessage = {
-              text: Lang.DELETED.format(match[1]),
-              footer: '_Restart to make effect_',
-              buttons: buttons,
-              headerType: 1
-          }
-        await message.client.sendMessage(message.jid,buttonMessage);
-    }
+       }
 }));

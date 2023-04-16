@@ -12,10 +12,10 @@ var badwordsRegExp = require('badwords/regexp');
 const {
     getString
 } = require('./misc/lang');
+const {ChatGPT, Davinci} = require('./misc/AI');
 const {
     getJson,
-    gtts,
-    chatGPT
+    gtts
 } = require('./misc/misc');
 const gis = require('async-g-i-s');
 const axios = require('axios');
@@ -51,13 +51,25 @@ Module({
     desc: Lang.TRANSLATE_DESC,
     use: 'utility'
 }, async (message, match) => {
-    if (!message.reply_message) return await message.sendReply(Lang.NEED_REPLY)
-    var from = match[1].split(" ")[0] || ''
-    var to = match[1].split(" ")[1] || match[1]
-    translate(message.reply_message.message, {
-        from: from,
-        to: to
-    }).then(async (res) => {
+    if (!message.reply_message?.message) return await message.sendReply(Lang.NEED_REPLY)
+    match = match[1]
+    async function parseLanguages(input) {
+        const inputArr = input.trim().split(" ");
+        if (inputArr.length === 1) {
+          return {
+            from: "auto",
+            to: inputArr[0].toLowerCase()
+          };
+        } else if (inputArr.length === 2) {
+          return {
+            from: inputArr[0].toLowerCase(),
+            to: inputArr[1].toLowerCase()
+          };
+        } else {
+          return await message.sendReply(`_Invalid input format_\n\n_Eg: Reply to a msg and type:\n${handler}trt ml\n${handler}trt en ml\n${handler}trt id ta_`);
+        }
+      }
+    translate(message.reply_message.message,await parseLanguages(match)).then(async (res) => {
         if ("text" in res) {
             await message.sendReply(res.text);
         }
@@ -76,7 +88,7 @@ Module({
     }
     query = query.replace("tts","")
     var lng = 'en';
-    if (/[^\x00-\x7F]+/.test(query)) lng = 'ml';
+    if (/[\u0D00-\u0D7F]+/.test(query)) lng = 'ml';
     let
         LANG = lng,
         ttsMessage = query,
@@ -123,16 +135,43 @@ Module({
          if (buff) await message.send(buff, 'image');
         }
 }));
+/*
 Module({
     pattern: 'gpt ?(.*)',
     fromMe: w,
-    desc: "OpenAI's ChatGPT like languauge model, used for text generation",
+    desc: "OpenAI's ChatGPT's official languauge model, used for text generation, researches, and natural conversations",
     use: 'AI',
-    usage: '.gpt Write a short note about India'
+    usage: '.gpt Write a short note about Lionel Messi'
 }, (async (message, match) => {
     if (!match[1]) return await message.sendReply("Need any query!");
-    const {result} = await chatGPT(match[1])
-    return await message.sendReply(result)
+    if (!process.env.OPENAI_KEY) return await message.sendReply("_No OpenAI API key found. Get an API key:_\n\n_1. Create an account: https://platform.openai.com/signup/_\n\n_2. Then, open this url: https://platform.openai.com/account/api-keys and copy api key_\n\n_3. Add the key into OPENAI_KEY var using .setvar_\n\n_(Eg: .setvar OPENAI_KEY:yourkeyhere )_" )
+    const {text} = await ChatGPT(match[1],process.env.OPENAI_KEY)
+    return await message.sendReply(text || "_No response returned, please try again_")
+})); */
+Module({
+    pattern: 'gpt ?(.*)',
+    fromMe: w,
+    desc: "OpenAI's yet another languauge model, best model for text generation and better prompt analysis",
+    use: 'AI',
+    usage: '.gpt Write a short note about Lionel Messi'
+}, (async (message, match) => {
+    if (!match[1]) return await message.sendReply("Need any query!");
+    const result = await Davinci(match[1])
+    const text = result.result?result.result:result;
+    return await message.sendReply(text)
+}));
+Module({
+    pattern: 'davinci ?(.*)',
+    fromMe: w,
+    dontAddCommandList:true,
+    desc: "OpenAI's yet another languauge model, best model for text generation and better prompt analysis",
+    use: 'AI',
+    usage: '.gpt Write a short note about Lionel Messi'
+}, (async (message, match) => {
+    if (!match[1]) return await message.sendReply("Need any query!");
+    const result = await Davinci(match[1])
+    const text = result.result?result.result:result;
+    return await message.sendReply(text)
 }));
 Module({
     pattern: 'zipcode ?(.*)',
