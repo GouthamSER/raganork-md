@@ -7,7 +7,7 @@ const {
     isAdmin,
     isFake,
     antifake,pdm,
-    parseWelcome
+    parseWelcome, antipromote, antidemote
 } = require('./misc/misc');
 const {
     setAutoMute,
@@ -187,6 +187,7 @@ Module({
     on: "group_update",
     fromMe: false
 }, async (message, match) => {
+    message.myjid = message.client.user.id.split(':')[0]
     var db = await antifake.get();
     const jids = []
     db.map(data => {
@@ -197,17 +198,47 @@ Module({
     pdmdb.map(data => {
         pdmjids.push(data.jid)
     });
-    if ((message.update == 'promote' || message.update == 'demote') && pdmjids.includes(message.jid)) {
+    var apdb = await antipromote.get();
+    const apjids = []
+    apdb.map(data => {
+        apjids.push(data.jid)
+    });
+    var addb = await antidemote.get();
+    const adjids = []
+    addb.map(data => {
+        adjids.push(data.jid)
+    });
     var admin_jids = [];
     var admins = (await message.client.groupMetadata(message.jid)).participants.filter(v => v.admin !== null).map(x => x.id);
     admins.map(async (user) => {
         admin_jids.push(user.replace('c.us', 's.whatsapp.net'));
     });
-    if (message.update == 'demote') admin_jids.push(message.participant[0])
+    if ((message.update == 'promote' || message.update == 'demote') && pdmjids.includes(message.jid)) {
+        if (message.from.split("@")[0] == message.myjid) return;
+        if (message.update == 'demote') admin_jids.push(message.participant[0])
         await message.client.sendMessage(message.jid, {
                 text: `_*[${message.update=='promote'?"Promote detected":"Demote detected"}]*_\n\n_@${message.from.split("@")[0]} ${message.update}d @${message.participant[0].split("@")[0]}_`,
                 mentions: admin_jids
             });
+    }
+    if (message.update == 'promote' && apjids.includes(message.jid)) {
+        if (message.from.split("@")[0] == message.myjid || message.participant[0].split("@")[0] == message.myjid) return;
+        var admin = await isAdmin(message);
+        if (!admin) return;
+        await message.client.groupParticipantsUpdate(message.jid, [message.from], "demote")
+        return await message.client.groupParticipantsUpdate(message.jid, [message.participant[0]], "demote")
+    }
+    if (message.update == 'demote' && adjids.includes(message.jid)) {
+        if (message.from.split("@")[0] == message.myjid) return;
+        if (message.participant[0].split("@")[0] == message.myjid) {
+            return await message.client.sendMessage(message.jid, {
+            text: `_*Bot number was demoted, I'm unable to execute anti-demote* [Demoted by @${message.from.split("@")[0]}]_`,
+            mentions: admin_jids
+        });
+    }   var admin = await isAdmin(message);
+        if (!admin) return;
+        await message.client.groupParticipantsUpdate(message.jid, [message.from], "demote")
+        return await message.client.groupParticipantsUpdate(message.jid, [message.participant[0]], "promote")
     }
     if (message.update === 'add' && jids.includes(message.jid)) {
         var allowed = ALLOWED.split(",");

@@ -17,7 +17,8 @@ const {
     getJson,
     gtts
 } = require('./misc/misc');
-const gis = require('async-g-i-s');
+const gis = require('./misc/gis');
+const cheerio = require('cheerio');
 const axios = require('axios');
 const fs = require('fs');
 const Lang = getString('scrapers');
@@ -125,10 +126,10 @@ Module({
     var count = parseInt(match[1].split(",")[1]) || 5
     var query = match[1].split(",")[0] || match[1];
     if (badwordsRegExp.test(query)) return await message.sendReply(`_The word "${query.match(badwordsRegExp)}" is blocked!_`)
-    const results = await gis(query);
-        await message.sendReply(Lang.IMG.format(results.splice(0, count).length, query))
+    const results = await gis(query,count);
+        await message.sendReply(Lang.IMG.format(results.length, query))
         for (var i = 0; i < (results.length < count ? results.length : count); i++) {
-         try { var buff = await skbuffer(results[i].url); } catch {
+         try { var buff = await skbuffer(results[i]); } catch {
 		 count++
 	        var buff = false
 	 }
@@ -209,6 +210,20 @@ Module({
     if (mime.includes("video")) return await message.send(file,"video",{quoted})
     await message.client.sendMessage(message.jid,{document:file,mimetype:mime,fileName:"Content from "+match.split("/")[2]},{quoted});
 }));
+Module({pattern:'drive ?(.*)', fromMe: true}, async (message, match) => {     
+    if (match[1] || message.reply_message?.text){
+    match = match[1] ? match[1] : message.reply_message.text
+    match = match.match(/\bhttps?:\/\/\S+/gi).filter(e=>e.includes("drive"))
+    for (var i in match){
+    const {data} = await axios(match[i])
+    var $ = cheerio.load(data);
+    var title = $("title").text().split(" - ")[0];
+    const fileBuffer = await skbuffer(`https://drive.google.com/uc?export=download&id=${match[i].split('/')[5]}`)
+    const {mime} = await fromBuffer(fileBuffer) 
+    await message.client.sendMessage(message.jid,{document:fileBuffer, mimetype:mime,fileName:title},{quoted:message.quoted || message.data})
+    }
+    }
+    })
 Module({
     pattern: 'doc ?(.*)',
     fromMe: w,
@@ -216,9 +231,14 @@ Module({
     use: 'utility'
 }, (async (message, match) => {
     if (!message.reply_message) return await message.sendReply("_Need a file!_");
-    match = match[1] ? match[1] : "file"
+    match = match[1] ? match[1] : "file-"+Date.now()
     let file = fs.readFileSync(await message.reply_message.download())
-    let {mime, ext} = await fromBuffer(file)
+    let analysedBuffer = await fromBuffer(file)
+    let mime = analysedBuffer.mime, ext = analysedBuffer.ext;
+    if (('documentMessage' in message.quoted.message) && !mime){
+        mime = message.quoted.message.documentMessage.mimetype
+        ext = message.quoted.message.documentMessage.fileName.split('.')[1] || ''
+    } 
     await message.client.sendMessage(message.jid,{document:file,mimetype:mime,fileName:match+"."+ext},{quoted: message.quoted});
 }));
 Module({
@@ -363,23 +383,18 @@ Module({
 }, async (message, match) => {
     if (!match[1]) return await message.sendReply("_Need a movie/series name_");
     var news = [];
-    var res = (await axios(`https://raganork-api.souravkl11.xyz/api/subtitles?query=${match[1]}`)).data
+    var res = (await axios(`https://raganork.ml/api/subtitles?query=${match[1]}`)).data
 	if (!res) return await message.sendReply('_No results!_');
     if (res?.length && !('dl_url' in res)){
-    for (let i of res) {
-    news.push({title: i.title,rowId:handler+'subtitle '+i.url});
-    }
-    const sections = [{title: "Select a result to download subtitle file!",rows: news}];
-    const listMessage = {
-        footer: "_Subtitles from opensubtitles.org_",
-        text:" ",
-        title: 'Matching subtitles',
-        buttonText: "View all",
-        sections
-    }
-    return await message.client.sendMessage(message.jid, listMessage,{quoted: message.data})
-} else if ("dl_url" in res){
-  return await message.client.sendMessage(message.jid,{document: {url: res.dl_url},fileName:res.title+'.srt',caption:'_*File:* '+res.title.trim()+'_',mimetype:'application/x-subrip'},{quoted:message.data})
+    var list = `_*Subtitles matching "${match[1]}":*_\n\n`
+      var _i = 0;
+      for (var i in res){
+        const title = res[i].title
+          _i++
+          list+=`${_i}. *_${title}_*\n`
+      }
+      list+=`\n_Send number as reply to download_`
+      await message.sendReply(list)
 } else return await message.sendReply('_No results!_');
 });
 Module({

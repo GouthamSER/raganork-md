@@ -41,7 +41,7 @@ Module({
         delete: true,
         lastMessages: [{ key: message.data.key, messageTimestamp:message.data.messageTimestamp }]
       },message.jid)
-    return await message.send("_Chat cleared!_")  
+    return  await message.send("_Chat cleared!_")  
 }));
     Module({
     pattern: 'kick ?(.*)',
@@ -93,6 +93,7 @@ Module({
     pattern: 'add ?(.*)',
     fromMe: true,
     desc: Lang.ADD_DESC,
+    warn:"You number might get banned, use with caution",
     use: 'group'
 }, (async (message, match) => {
     if (!message.isGroup) return await message.sendReply(Lang.GROUP_COMMAND)
@@ -330,9 +331,9 @@ var g2 = (await message.client.groupMetadata(message.jid))
 var common = g1.participants.filter(({ id: id1 }) => g2.participants.some(({ id: id2 }) => id2 === id1));
 var jids = [];
 var msg = `Kicking common participants of:* ${g1.subject} & ${g2.subject} \n_count: ${common.length} \n`
-common.map(async s => {
-msg += "```@"+s.id.split("@")[0]+"```\n"
-jids.push(s.id.split("@")[0]+"@s.whatsapp.net")
+common.map(e=>e.id).filter(e=>!e.includes(message.myjid)).map(async s => {
+msg += "```@"+s.split("@")[0]+"```\n"
+jids.push(s.split("@")[0]+"@s.whatsapp.net")
 })    
 await message.client.sendMessage(message.jid, {
         text: msg,

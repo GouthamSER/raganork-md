@@ -16,7 +16,7 @@ async function webpUpload(file){
 });
 }
 const {Module} = require('../main');const ffmpeg = require('fluent-ffmpeg');
-const {upload} = require('raganork-bot');
+const {upload} = require('./misc/imgur');
 let a = MODE == 'public' ? false : true;
 Module({pattern: 'url ?(.*)', fromMe: a,use: 'utility', desc:'Uploads image to imgur.com'},async (m) => { 
 if (m.reply_message.sticker){
@@ -32,7 +32,11 @@ else if (m.reply_message.audio){
 });
 }
 else if (m.reply_message.image || m.reply_message.video){
-try { await m.client.sendMessage(m.jid,{text:"_"+(await upload(await m.reply_message.download())).link+"_"},{quoted: m.quoted}) } catch {return await m.client.sendMessage(m.jid,{text:"_Failed to upload file!_"},{quoted: m.quoted});}
+let {link} = await upload(await m.reply_message.download())
+if (typeof link == 'function'){
+    return await m.sendReply("_There are issues with Bot's IP & imgur, so uploading can't be done_")
+}
+try { await m.client.sendMessage(m.jid,{text:"_"+link+"_"},{quoted: m.quoted}) } catch {return await m.client.sendMessage(m.jid,{text:"_Failed to upload file!_"},{quoted: m.quoted});}
 }
 else return await m.sendReply("_Reply to image|video|audio|sticker_");
 });

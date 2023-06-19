@@ -25,6 +25,7 @@ const {
     pin,
     story,
     tiktok,
+    igStalk,
     fb
 } = require('./misc/misc');
 const Config = require('../config');
@@ -77,7 +78,10 @@ Module({
      if (/\bhttps?:\/\/\S+/gi.test(q)) q = q.match(/\bhttps?:\/\/\S+/gi)[0]
      if (!q) return await msg.sendReply("*Need Facebook link*")
      var res = await fb(q);
-     return await msg.sendReply({url: res['hd']},"video")
+     let sent_msg = await msg.sendReply('_*Hold on, downloading will take some time..*_')
+    const end = new Date().getTime()
+    await msg.sendReply({url: res.url},"video")
+    return await msg.edit('*_Download complete!_*',msg.jid,sent_msg.key)
         }));
 Module({
     pattern: 'ig ?(.*)',
@@ -85,25 +89,19 @@ Module({
     desc: 'Gets account info from instagram',
     usage: 'ig username',
     use: 'search'
-}, (async (msg, query) => {
-    if (query[1] === 'dl') return; 
-    if (query[1] === '') return await msg.client.sendMessage(msg.jid, {
-        text: need_acc
+}, (async (message, match) => {
+    if (!match[1]) return await message.sendReply("_Need instagram username!_")
+    if (match[1].startsWith("https") && match[1].includes("instagram")) {
+        const _regex = /instagram\.com\/([^/?]+)/i;
+        const _match = match[1].match(_regex);
+        match[1] = _match && _match[1];
+    }
+    try { var res = await igStalk(encodeURIComponent(match[1])) } catch { return await message.sendReply("_Server busy!_")}
+    await message.client.sendMessage(message.jid, {
+        image: {url: res.profile_pic},
+        caption: '_*Name:*_ ' + `${res.full_name}` + '\n_*Followers:*_ ' + `${res.followers}` + '\n_*Following:*_ ' +res.following+ '\n_*Bio:*_ ' + `${res.bio}` + '\n_*Private account:*_ ' + `${res.is_private?"Yes":"No"} ` + '\n_*Posts:*_ ' + `${res.posts}`
     }, {
-        quoted: msg.data
-    })
-    var res = await getStalk(query[1])
-    if (res === "false") return await msg.client.sendMessage(msg.jid, {
-        text: "*_Username invalid!_*"
-    }, {
-        quoted: msg.data
-    })
-    var buffer = await skbuffer(res.hd_profile_pic_url_info.url)
-    await msg.client.sendMessage(msg.jid, {
-        image: buffer,
-        caption: '_*Name:*_ ' + `${res.fullname}` + '\n _*Bio:*_ ' + `${res.biography}` + '\n _*Private account:*_ ' + `${res.is_private} ` + '\n _*Followers:*_ ' + `${res.followers}` + '\n _*Following:*_ ' + `${res.following}` + '\n _*Posts:*_ ' + `${res.post_count}` + '\n _*Verified:*_ ' + `${res.is_verified} ` + '\n _*IGTV videos:*_ ' + `${res.total_igtv_videos}`
-    }, {
-        quoted: msg.data
+        quoted: message.data
     });
 }));
 Module({
@@ -148,19 +146,32 @@ Module({
 }
 }));
 Module({
-    pattern: 'pin ?(.*)',
+    pattern: 'pinterest ?(.*)',
     fromMe: sourav,
     desc: 'Pinterest downloader',
-    usage: '.pin reply or link',
+    usage: '.pinterest reply or link',
     use: 'download'
 }, (async (msg, query) => {
     var user = query[1] !== '' ? query[1] : msg.reply_message.text;
     if (user === 'g') return;
     if (!user) return await msg.sendReply("*Need url*");
-    if (/\bhttps?:\/\/\S+/gi.test(user)) user = user.match(/\bhttps?:\/\/\S+/gi)[0]
+    if (/\bhttps?:\/\/\S+/gi.test(user)) {
+        user = user.match(/\bhttps?:\/\/\S+/gi)[0]
     try { var res = await pin(user) } catch {return await msg.sendReply("*Server error*")}
     var quoted = msg.reply_message ? msg.quoted : msg.data
     await msg.client.sendMessage(msg.jid,{[res.endsWith('jpg')?'image':'video']:{url:res}},{quoted})
+    }
+}));
+Module({
+    pattern: 'pin ?(.*)',
+    fromMe: sourav,
+    use: 'download'
+}, (async (msg, query) => {
+    var user = query[1] !== '' ? query[1] : msg.reply_message.text;
+    if (user === 'g') return;
+    if (/\bhttps?:\/\/\S+/gi.test(user)) {
+    await msg.sendReply("_Use .pinterest command for downloading content from this link!_")   
+    }
 }));
 Module({
     pattern: 'tiktok ?(.*)',
@@ -172,17 +183,12 @@ Module({
     var link = query[1] !== '' ? query[1] : msg.reply_message.text;
     if (!link) return await msg.sendReply("_Need a tiktok url_");
     link = link.match(/\bhttps?:\/\/\S+/gi)[0]
-    const buttons = [
-        {buttonId: hnd+'upload '+'https://api.akuari.my.id/downloader/tiktoknowm?link='+link, buttonText: {displayText: 'No watermark'}, type: 1},
-        {buttonId: hnd+'upload '+'https://api.akuari.my.id/downloader/tiktokwithwm?link='+link, buttonText: {displayText: 'With watermark'}, type: 1}
-       ]
-      const buttonMessage = {
-          text: "_Select video type_",
-          footer: '',
-          buttons: buttons,
-          headerType: 1
-      }
-       await msg.client.sendMessage(msg.jid, buttonMessage,{quoted:msg.data})
+    try {
+        let {result} = await tiktok(link)
+        await msg.sendReply({url:result},'video')        
+    } catch (error) {
+        await msg.sendReply("_Server busy!_")
+    }
       }));
     Module({
         on: 'button',

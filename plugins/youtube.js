@@ -11,8 +11,10 @@ const {
   MODE,
   HANDLERS,
   AUDIO_DATA,
-  BOT_INFO
+  BOT_INFO,
+  settingsMenu
 } = require('../config');
+const config = require('../config');
 const ffmpeg = require('fluent-ffmpeg');
 // let parseBotJid = (id) => id+"@s.whatsapp.net";
 const {
@@ -27,12 +29,14 @@ const {
     ytTitle,downloadYT, dlSong, ytv, getResolutions
   } = require('./misc/yt');
 const Lang = getString('scrapers');
+const {setVar} = require('./manage');
 const {
   skbuffer,
   ytdlServer,
   getVideo,
   addInfo
 } = require('raganork-bot');
+let configs = settingsMenu
 var handler = HANDLERS !== 'false'?HANDLERS.split("")[0]:""
 let fm = MODE == 'public' ? false : true
 const getID = /(?:http(?:s|):\/\/|)(?:(?:www\.|)youtube(?:\-nocookie|)\.com\/(?:watch\?.*(?:|\&)v=|embed|shorts\/|v\/)|youtu\.be\/)([-_0-9A-Za-z]{11})/;
@@ -331,6 +335,20 @@ async function parseReply(reply,no_){
     var videoID = reply.split("\n").filter(x=>x.startsWith(`_video_id`))?.[0]?.split(" ")[1].trim().replace(/_+$/, "");  
     return {res:query,videoID}
   }
+  if (reply?.includes("Available quality")){
+    var query = reply.split("\n").filter(x=>x.startsWith(`${no_}.`))?.[0]?.replace(`${no_}. `,"").trim().replace(/(\*\_|_\*)/g,"")  
+    query = (query.replace(query.match(/\([^)]+\)/g)[(query.match(/\([^)]+\)/g)).length-1],"")).trim()
+    var videoID = reply.split("\n").filter(x=>x.startsWith(`_video_id`))?.[0]?.split(" ")[1].trim().replace(/_+$/, "");  
+    return {res:query,videoID}
+  }
+  if (reply?.includes("Subtitles matching")){
+    var query = reply.split("\n").filter(x=>x.startsWith(`${no_}.`))?.[0]?.replace(`${no_}. `,"").trim().replace(/(\*\_|_\*)/g,"")  
+    return query
+  }
+  if (reply?.includes("Settings configuration menu")){
+    var query = reply.split("\n").filter(x=>x.startsWith(`${no_}.`))?.[0]?.replace(`${no_}. `,"").trim().replace(/(\*\_|_\*)/g,"")  
+    return query
+  }
   var query = reply.split("\n").filter(x=>x.startsWith(`${no_}.`))?.[0]?.replace(`${no_}. `,"").trim().replace(/(\*\_|_\*)/g,"")
   if (!query) throw "_Invalid number, only 20 results are given!_"
   query = (query.replace(query.match(/\([^)]+\)/g)[(query.match(/\([^)]+\)/g)).length-1],"")).trim()
@@ -340,18 +358,28 @@ async function parseReply(reply,no_){
   if (!sr?.id) throw "_No results found!_"
   // let link = YT_BASEURL.format(sr?.id)
   return sr?.id         
-}
+  }
 
 Module({
   on: 'text',
   fromMe: fm
   }, (async (message, match) => {
   if (message.reply_message){
-    try {
+    try { 
   let reply = message.reply_message?.text || message.quoted?.message?.imageMessage?.caption;
-    if (reply!==undefined && !!reply && message.quoted.key.id.startsWith("BAE") && message.quoted.key.participant.includes(message.myjid)){
-      var no_ = /\d+/.test(message.message) ? message.message.match(/\d+/)[0] : false
-      if (!no_) throw "_Reply must be  a number_";
+    if (reply!==undefined && !!reply && (message.quoted.key.id.startsWith("RGNK") || message.quoted.key.id.startsWith("BAE")) && message.quoted.key.participant.includes(message.myjid)){
+      let no_ = /\d+/.test(message.message) ? message.message.match(/\d+/)[0] : false
+      let onOrOff = (message.message.toLowerCase().includes('on') || message.message.toLowerCase().includes('off')) ? message.message.toLowerCase().trim() : false
+      if (onOrOff){
+        let action = onOrOff == 'on'?'true':'false';
+      let set_action = reply.split('\n')[0].replace(/(\*\_|_\*)/g,"")
+      if (configs.map(e=>e.title).includes(set_action)){
+        let {env_var} = configs.filter(e=>e.title==set_action)[0]
+        await message.sendReply(`*${set_action} ${(onOrOff == 'on'?"enabled ✅":"disabled ❌")}*`)
+        await setVar(env_var.trim(),action)
+      }
+      }
+      if (!no_) return;
           if (reply?.includes("Search results")){
             let videoID = await parseReply(reply,no_);
             var {
@@ -364,13 +392,32 @@ Module({
             }
             return await message.client.sendMessage(message.jid,Message)
             }            
-          }
+          if (reply?.includes("Settings configuration menu")){
+            let item = await parseReply(reply,no_);
+            let {env_var} = configs.filter(e=>e.title==item)[0]
+            let msgToBeSent = `_*${item}*_\n\n_Current status: ${config[env_var] ?'on':'off'}_\n\n_Reply *on/off*_`;
+            return await message.sendReply(msgToBeSent)
+            }                        
           if (reply?.includes("Available quality")){
               let {res,videoID} = await parseReply(reply,no_);
               const result__ = await ytv(videoID,res)
               const title = await ytTitle(videoID)
               return await message.client.sendMessage(message.jid,{video:result__,caption:`_${title} *[${res}]*_`},{quoted:message.data}) 
           }
+          if (reply?.includes("Subtitles matching")){
+              let query = await parseReply(reply,no_);
+              let res = (await require("axios")(`https://raganork.ml/api/subtitles?query=${query}`)).data
+              if (res.length) res = res.filter(x=>x.title == query)
+              res = (await require("axios")(`https://raganork.ml/api/subtitles?query=${res[0].url}`)).data
+              if (res.length && !('dl_url' in res)) 
+              {
+                res = res.filter(x=>x.title == query)
+                res = (await require("axios")(`https://raganork.ml/api/subtitles?query=${res[0].url}`)).data
+              }
+              if ('dl_url' in res) {
+                return await message.client.sendMessage(message.jid,{document: {url: res.dl_url},fileName:res.title+'.srt',caption:'_*Here\'s your subtitle file!*_',mimetype:'application/x-subrip'},{quoted:message.data})
+              } 
+            }
           if (reply?.includes("Results matching")){
             let videoID = await parseReply(reply,no_);
               const title = await ytTitle(videoID);
@@ -405,7 +452,7 @@ Module({
                   quoted: message.data
               });
              }); 
-            } else if (no_ == 2){
+            } if (no_ == 2){
               let videoID = await parseReply(reply,no_);
               await message.sendReply("_Downloading video..._")
               const video = await ytv(videoID)
@@ -417,8 +464,9 @@ Module({
               thumbnail: await skbuffer(`https://i.ytimg.com/vi/${videoID}/hqdefault.jpg`)
         },{quoted:message.data});
             } else throw "_Invalid number, reply 1 for audio and 2 for video_"
-          }
-        } catch (error) {
+          };
+        }
+       } catch (error) {
           console.log("")
         }  
       }
