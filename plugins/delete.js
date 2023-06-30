@@ -7,20 +7,23 @@ const {
     Module
 } = require('../main');
 const {isAdmin} = require("./misc/misc")
+const {ADMIN_ACCESS} = require('../config');
 Module({
     pattern: 'del',
-    fromMe: true,
+    fromMe: false,
     desc: 'Deletes message for everyone. Supports admin deletion'
 }, (async (m, t) => {
-    m.jid = m.quoted.key.remoteJid
+    let adminAccesValidated = ADMIN_ACCESS ? await isAdmin(m,m.sender) : false;
     if (!m.reply_message) return;
+    if (m.fromOwner || adminAccesValidated) {
+    m.jid = m.quoted.key.remoteJid
     if (m.quoted.key.fromMe) return await m.client.sendMessage(m.jid, { delete: m.quoted.key })
     if (!m.quoted.key.fromMe) {
     var admin = await isAdmin(m);
     if (!admin) return await m.sendReply("_I'm not an admin!_")
     return await m.client.sendMessage(m.jid, { delete: m.quoted.key })
     }
-}));
+}}));
 Module({
     pattern: 'reboot',
     fromMe: true,

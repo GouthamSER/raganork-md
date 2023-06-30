@@ -3,6 +3,18 @@ Licensed under the  GPL-3.0 License;
 you may not use this file except in compliance with the License.
 Raganork MD - Sourav KL11
 */
+function containsDisallowedWords(str,disallowedWords) {
+    for (let word of disallowedWords){
+      if (str.match(word)){
+        let otherWords = str.replace(word,'±').split('±')
+        for (let _word of otherWords){
+          str = str.replace(_word,'')
+        }
+        let filteredWord = str;
+        return filteredWord;
+      } 
+    }
+  }
 function checkLinks(links, allowedWords) {
     let testArray = []
     for (let i = 0; i < links.length; i++) {
@@ -37,6 +49,7 @@ async function sendButton(buttons,text,footer,message){
     const {
         isAdmin,
         antilink,
+        antiword,
         antibot,
         antispam,
         antipromote,
@@ -52,7 +65,7 @@ async function sendButton(buttons,text,footer,message){
     const Config = require('../config');
     const config = require('../config');
     const {getCommands} = require('./commands');
-    const {HEROKU, settingsMenu} = require('../config');
+    const {HEROKU, settingsMenu,ADMIN_ACCESS} = require('../config');
     const Heroku = require('heroku-client');
     const fs = require('fs');
     const got = require('got');
@@ -88,7 +101,7 @@ async function sendButton(buttons,text,footer,message){
         value = value.trim()
         let setvarAction = isHeroku ? "restarting" : isVPS ? "rebooting" : "redeploying";
         var set_ = `_Successfully set ${key} to ${value}, {}.._`;
-        set_ = key == "ANTI_BOT" ? `AntiBot activated, bots will be automatically kicked, {}` : key == "ANTI_SPAM" ? `AntiSpam activated, spammers will be automatically kicked, {}` :key == "CHATBOT" ? `AI Chatbot activated, {}` : key == "MODE" ? `Mode switched to ${value}, {}`:set_;
+        set_ = key == "ANTI_BOT" ? `AntiBot activated, bots will be automatically kicked, {}` : key == "ANTI_SPAM" ? `AntiSpam activated, spammers will be automatically kicked, {}` :key == "CHATBOT" ? `AI Chatbot turned ${value}, {}` : key == "MODE" ? `Mode switched to ${value}, {}`:set_;
         set_ = set_.format(setvarAction)
         let m = message;
         if (isHeroku) {
@@ -167,9 +180,18 @@ fs.writeFileSync('./config.env', lines.join('\n'));
     Module({
         pattern: 'platform',
         fromMe: true,
-        use: 'owner'
+        use: 'settings'
     }, (async (message, match) => {
       return await message.sendReply(`_Bot is running on ${config.PLATFORM}_`)
+    }));
+    Module({
+        pattern: 'language ?(.*)',
+        fromMe: true,
+        desc: "Change bot's language for some commands",
+        use: 'settings'
+    }, (async (message, match) => {
+      if (!match[1] || !["english","manglish","turkish"].includes(match[1].toLowerCase())) return await message.sendReply("_Invalid language! Available languages are English, Manglish and Turkish_");  
+      return await setVar("LANGUAGE",match[1].toLowerCase(),message)
     }));
     Module({
         pattern: 'shutdown$',
@@ -334,7 +356,7 @@ fs.writeFileSync('./config.env', lines.join('\n'));
         pattern: 'mode ?(.*)',
         fromMe: true,
         desc: "Change bot mode to public & private",
-        use: 'config'
+        use: 'settings'
     }, (async (message, match) => {
         if (match[1]?.toLowerCase() == "public" || match[1]?.toLowerCase() == "private"){
             return await setVar("MODE",match[1],message)
@@ -411,10 +433,12 @@ const oldSudo = config.SUDO?.split(",")
     }));
     Module({
         pattern: 'antibot ?(.*)',
-        fromMe: true,
+        fromMe: false,
         desc: "Detects other bot's messages and kicks.",
         use: 'group'
     }, (async (message, match) => {
+        let adminAccesValidated = ADMIN_ACCESS ? await isAdmin(message,message.sender) : false;
+        if (message.fromOwner || adminAccesValidated) {
         match[1]=match[1]?match[1].toLowerCase():""
         var db = await antibot.get();
         const jids = []
@@ -434,13 +458,15 @@ const oldSudo = config.SUDO?.split(",")
         return await message.sendReply(`_Antibot menu of ${subject}_`+"\n\n_Antibot is currently turned *"+status+"*_\n\n_Use .antibot on/off_")
         }
         await message.sendReply(match[1] === "on" ? "_Antibot activated!_" : "_Antibot turned off!_");
-    }));
+    }}));
     Module({
         pattern: 'antispam ?(.*)',
-        fromMe: true,
+        fromMe: false,
         desc: "Detects spam messages and kicks user.",
         use: 'group'
     }, (async (message, match) => {
+        let adminAccesValidated = ADMIN_ACCESS ? await isAdmin(message,message.sender) : false;
+        if (message.fromOwner || adminAccesValidated) {
         match[1]=match[1]?match[1].toLowerCase():""
         var db = await antispam.get();
         const jids = []
@@ -460,13 +486,15 @@ const oldSudo = config.SUDO?.split(",")
         return await message.sendReply(`_Anti spam menu of ${subject}_`+"\n\n_Antispam is currently turned *"+status+"*_\n\n_Use .antispam on/off_")
         }
         await message.sendReply(match[1] === "on" ? "_Antispam activated!_" : "_Antispam turned off!_");
-    }));
+    }}));
     Module({
         pattern: 'pdm ?(.*)',
-        fromMe: true,
+        fromMe: false,
         desc: "Detects promote/demote and sends alert.",
         use: 'group'
     }, (async (message, match) => {
+        let adminAccesValidated = ADMIN_ACCESS ? await isAdmin(message,message.sender) : false;
+        if (message.fromOwner || adminAccesValidated) {
         match[1]=match[1]?match[1].toLowerCase():""
         var db = await pdm.get();
         const jids = []
@@ -485,7 +513,7 @@ const oldSudo = config.SUDO?.split(",")
         return await message.sendReply(`_Promote|demote alert message menu of ${subject}_`+"\n\n_PDM alert is currently turned *"+status+"*_\n\n_Use .pdm on/off_")
         }
         await message.sendReply(match[1] === "on" ? "_Pdm activated!_" : "_Pdm turned off!_");
-    }));
+    }}));
     Module({
         pattern: 'antidemote ?(.*)',
         fromMe: true,
@@ -538,16 +566,38 @@ const oldSudo = config.SUDO?.split(",")
     }));
     Module({
         pattern: 'antilink ?(.*)',
-        fromMe: true,
+        fromMe: false,
         desc: "Activates antilink, kicks if user sends link",
         use: 'group'
     }, (async (message, match) => {
+        let adminAccesValidated = ADMIN_ACCESS ? await isAdmin(message,message.sender) : false;
+        if (message.fromOwner || adminAccesValidated) {
         match[1]=match[1]?match[1].toLowerCase():""
         var db = await antilink.get();
         const jids = []
         db.map(data => {
             jids.push(data.jid)
         });
+        var antilinkWarn = process.env.ANTILINK_WARN?.split(',') || []
+        if (match[1].includes("warn")){
+            if (match[1].endsWith("on")) {
+            if (!(await isAdmin(message))) return await message.sendReply("_I'm not an admin!_")
+            if (!antilinkWarn.includes(message.jid)){
+                antilinkWarn.push(message.jid)
+                await setVar("ANTILINK_WARN",antilinkWarn.join(','),false)
+                    }
+                    return await message.sendReply(`_Antilink warn has been activated in this group!_`); 
+                }
+            if (match[1].endsWith("off")) {
+            if (!(await isAdmin(message))) return await message.sendReply("_I'm not an admin!_")
+            if (antilinkWarn.includes(message.jid)){
+                await message.sendReply(`_Antilink warn deactivated!_`)
+                await setVar("ANTILINK_WARN",antilinkWarn.filter(x=>x!=message.jid).join(',')||"null",false)
+                }
+                    return await message.sendReply(`_Antilink warn de-activated!_`); 
+                }
+            
+            } 
         if (match[1] === "on"){
             if (!(await isAdmin(message))) return await message.sendReply("_I'm not an admin!_")
             await antilink.set(message.jid) 
@@ -556,26 +606,97 @@ const oldSudo = config.SUDO?.split(",")
             await antilink.delete(message.jid)  
         }
         if (match[1]!=="on" && match[1]!=="off"){
-        var status = jids.includes(message.jid) ? 'on' : 'off';
+        var status = jids.includes(message.jid) || antilinkWarn.includes(message.jid) ? 'on' : 'off';
         var {subject} = await message.client.groupMetadata(message.jid)
-        return await message.sendReply(`_Antilink menu of ${subject}_`+"\n\n_Antilink is currently turned *"+status+"*_\n\n_Use .antilink on/off_")
+        return await message.sendReply(`_Antilink menu of ${subject}_`+"\n\n_Antilink is currently turned *"+status+"*_\n\n_Eg: .antilink on/off_\n_.antilink warn on/off_\n\n_Use `setvar ALLOWED_LINKS:fb.com,google.com` to allow specific links_")
         }
         await message.sendReply(match[1] === "on" ? "_Antilink activated!_" : "_Antilink turned off!_");
-    }));
+   }}));
+    Module({
+        pattern: 'antiword ?(.*)',
+        fromMe: false,
+        desc: "Activates antiword, kicks if user sends not allowed words",
+        use: 'group'
+    }, (async (message, match) => {
+        let adminAccesValidated = ADMIN_ACCESS ? await isAdmin(message,message.sender) : false;
+        if (message.fromOwner || adminAccesValidated) {
+        match[1]=match[1]?match[1].toLowerCase():""
+        var db = await antiword.get();
+        const jids = []
+        db.map(data => {
+            jids.push(data.jid)
+        });
+        var antiwordWarn = process.env.ANTIWORD_WARN?.split(',') || []
+        if (match[1].includes("warn")){
+            if (match[1].endsWith("on")) {
+            if (!(await isAdmin(message))) return await message.sendReply("_I'm not an admin!_")
+            if (!antiwordWarn.includes(message.jid)){
+                antiwordWarn.push(message.jid)
+                await setVar("ANTIWORD_WARN",antiwordWarn.join(','),false)
+                    }
+                    return await message.sendReply(`_Antiword warn has been activated in this group!_`); 
+                }
+            if (match[1].endsWith("off")) {
+            if (!(await isAdmin(message))) return await message.sendReply("_I'm not an admin!_")
+            if (antiwordWarn.includes(message.jid)){
+                await message.sendReply(`_Antiword warn deactivated!_`)
+                return await setVar("ANTIWORD_WARN",antiwordWarn.filter(x=>x!=message.jid).join(',')||"null",false)
+                }
+                }
+            
+            }
+        if (match[1] === "on"){
+            if (!(await isAdmin(message))) return await message.sendReply("_I'm not an admin!_")
+            await antiword.set(message.jid) 
+        }
+        if (match[1] === "off"){
+            await antiword.delete(message.jid)  
+        }
+        if (match[1]!=="on" && match[1]!=="off"){
+        var status = jids.includes(message.jid) || antiwordWarn.includes(message.jid) ? 'on' : 'off';
+        var {subject} = await message.client.groupMetadata(message.jid)
+        return await message.sendReply(`_Antiword menu of ${subject}_`+"\n\n_Antiword is currently turned *"+status+"*_\n\n_Eg: .antiword on/off_\n_.antiword warn on/off_\n\n_Use `setvar ANTI_WORDS:fuck,nigga` to block custom words or set `ANTI_WORDS:auto` to auto detect bad words (It's already enabled by default!)_")
+        }
+        await message.sendReply(match[1] === "on" ? "_Antiword activated!_" : "_Antiword turned off!_");
+   }}));
     Module({
         on: 'text',
         fromMe: false
     }, (async (message, match) => {
         if (Config.CHATBOT === 'on') {
+            try {
             await chatBot(message, Config.BOT_NAME)
+            } catch {
+                return await message.sendReply("Ohh :/")
+            }
         }
-        if (/\bhttps?:\/\/\S+/gi.test(message.message)){
         var db = await antilink.get();
         const jids = []
         db.map(data => {
             jids.push(data.jid)
         });
+        var antiworddb = await antiword.get();
+        const antiwordjids = []
+        antiworddb.map(data => {
+            antiwordjids.push(data.jid)
+        });
+        if (antiwordjids.includes(message.jid)) {
+            var antiwordWarn = process.env.ANTIWORD_WARN?.split(',') || []
+            if (antiwordWarn.includes(message.jid)) return;
+            let disallowedWords = (process.env.ANTI_WORDS || "nigga,fuck").split(",");
+            if (process.env.ANTI_WORDS == 'auto') disallowedWords = require('badwords/array');
+            let thatWord = containsDisallowedWords(message.message,disallowedWords)
+            if (thatWord){
+                await message.sendReply(`_The word ${thatWord} is not allowed in this chat!_`);
+                await message.client.groupParticipantsUpdate(message.jid, [message.sender], "remove")
+                return await message.client.sendMessage(message.jid, { delete: message.data.key })
+                                
+            }
+        }
+        if (/\bhttps?:\/\/\S+/gi.test(message.message)){
         if (jids.includes(message.jid)) {
+        var antilinkWarn = process.env.ANTILINK_WARN?.split(',') || []
+        if (antilinkWarn.includes(message.jid)) return;
         let allowed = (process.env.ALLOWED_LINKS || "gist,instagram,youtu").split(",");
         let linksInMsg = message.message.match(/\bhttps?:\/\/\S+/gi)
         if (checkLinks(linksInMsg,allowed)) {
@@ -587,7 +708,8 @@ const oldSudo = config.SUDO?.split(",")
         }
         }
         }
-    }
+        }
+    
     }));
     
-module.exports = {setVar,fixHerokuAppName}
+module.exports = {setVar,fixHerokuAppName,containsDisallowedWords}
