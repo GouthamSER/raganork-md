@@ -1,9 +1,9 @@
 let fetch = require('node-fetch')
 const axios = require("axios")
 let { JSDOM } = require('jsdom')
-const { Innertube, UniversalCache } = require('youtubei.js');
+const { Innertube, UniversalCache, Utils} = require('youtubei.js');
 const { readFileSync, existsSync, mkdirSync, createWriteStream } = require('fs');
-const {streamToIterable} = require('youtubei.js/dist/src/utils/Utils');
+const {streamToIterable} = Utils;
 var path = require('path');
 function bytesToSize(bytes) {
   var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
@@ -57,19 +57,9 @@ async function ytTitle(vid){
   const video = await yt.getBasicInfo(vid);
   return video.basic_info.title
 }
-async function downloadYT(vid,type = 'video',quality = '360p'){
- try { 
-var result = (await axios(`https://y2mate.souravkl11.xyz/get?vid=${vid}&type=${type}&resolution=${quality}`)).data
-if (!result.url) result = (await axios(`https://y2mate.souravkl11.xyz/get?vid=${vid}&type=${type}&resolution=${quality}`)).data
-} catch {
-var result = (await axios(`https://y2mate.souravkl11.xyz/get?vid=${vid}&type=${type}&resolution=${quality}`)).data
-} 
-return result 
-}
 module.exports = {
   dlSong ,
   ytTitle,
   ytv, getResolutions,
-  downloadYT,
   servers: ['en154','en136', 'id4', 'en60', 'en61', 'en68']
 };

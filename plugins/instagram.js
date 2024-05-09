@@ -38,6 +38,11 @@ var fail = "*_Download failed! Check your link and try again_*";
 var need_acc_s = "_Need an instagram username or link!_";
 let sourav = setting.MODE == 'public' ? false : true
 let hnd = setting.HANDLERS !== 'false'? setting.HANDLERS.split("")[0]:"";
+function BypassCertificateCheck(){
+if (process.env.NODE_TLS_REJECT_UNAUTHORIZED != 0) {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = 0
+} 
+} 
 Module({
     pattern: 'insta ?(.*)',
     fromMe: sourav,
@@ -45,6 +50,7 @@ Module({
     usage: 'insta link or reply to a link',
     use: 'download'
 }, (async (msg, query) => {
+    BypassCertificateCheck();
      var q = query[1] || msg.reply_message?.text
      if (q && (q.startsWith('l') || q.includes('youtu'))) return;
     if (!q) return await msg.sendReply("*Need instagram link*")
@@ -74,6 +80,7 @@ Module({
     usage: 'fb link or reply to a link',
     use: 'download'
 }, (async (msg, query) => {
+    BypassCertificateCheck();
      var q = !msg.reply_message.message ? query[1] : msg.reply_message.message
      let _q = !msg.reply_message.message ? query[1] : msg.reply_message.message
      if (/\bhttps?:\/\/\S+/gi.test(q)) q = q.match(/\bhttps?:\/\/\S+/gi)[0]
@@ -91,6 +98,7 @@ Module({
     usage: 'ig username',
     use: 'search'
 }, (async (message, match) => {
+    BypassCertificateCheck();
     if (!match[1]) return await message.sendReply("_Need instagram username!_")
     if (match[1].startsWith("https") && match[1].includes("instagram")) {
         const _regex = /instagram\.com\/([^/?]+)/i;
@@ -112,6 +120,7 @@ Module({
     usage: '.story username or link',
     use: 'download'
 }, (async (msg, query) => {
+    BypassCertificateCheck();
     var user = query[1] !== '' ? query[1] : msg.reply_message.text;
     if (user && user.includes("/reel/") || user.includes("/tv/") || user.includes("/p/")) return;
     if (!user) return await msg.sendReply(need_acc_s);

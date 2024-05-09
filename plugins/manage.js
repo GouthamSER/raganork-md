@@ -4,6 +4,7 @@ you may not use this file except in compliance with the License.
 Raganork MD - Sourav KL11
 */
 function containsDisallowedWords(str,disallowedWords) {
+    str = str.toLowerCase()
     for (let word of disallowedWords){
       if (str.match(word)){
         let otherWords = str.replace(word,'±').split('±')
