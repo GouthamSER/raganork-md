@@ -297,6 +297,7 @@ Module({
     if (!s1.includes('youtu')) return await message.sendReply("*"+Lang.NEED_VIDEO+"*");
     const getID = /(?:http(?:s|):\/\/|)(?:(?:www\.|)youtube(?:\-nocookie|)\.com\/(?:watch\?.*(?:|\&)v=|embed|shorts\/|v\/)|youtu\.be\/)([-_0-9A-Za-z]{11})/
     var vid = getID.exec(s1)[1]
+    await message.sendReply('_Downloading_');
     const video = await ytv(vid)
     const caption = await ytTitle(vid)    
     return await message.client.sendMessage(message.jid, {
