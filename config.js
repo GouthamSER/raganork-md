@@ -256,7 +256,7 @@ const baseConfig = {
   ANTILINK_WARN: process.env.ANTILINK_WARN || "",
   ANTI_DELETE: convertToBool(process.env.ANTI_DELETE) || false,
   SUDO: process.env.SUDO || "917034898741",
-  LANGUAGE: process.env.LANGUAGE || "manglish",
+  LANGUAGE: process.env.LANGUAGE || "Manglish",
   AUTO_UPDATE: convertToBool(process.env.AUTO_UPDATE) || true,
   SUPPORT_GROUP: process.env.SUPPORT_GROUP || "https://t.me/wudixh12",
   ACR_A: "ff489a0160188cf5f0750eaf486eee74",
@@ -406,5 +406,6 @@ Object.defineProperty(config, "debug", {
 });
 
 module.exports = config;
+
 
 
