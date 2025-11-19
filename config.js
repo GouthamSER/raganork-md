@@ -191,7 +191,7 @@ const baseConfig = {
     "_I am alive! (use .setalive help for custom alive msg)_",
   BLOCK_CHAT: process.env.BLOCK_CHAT || "",
   PM_ANTISPAM: convertToBool(process.env.PM_ANTISPAM) || "",
-  ALWAYS_ONLINE: convertToBool(process.env.ALWAYS_ONLINE) || false,
+  ALWAYS_ONLINE: convertToBool(process.env.ALWAYS_ONLINE) || true,
   MANGLISH_CHATBOT: convertToBool(process.env.MANGLISH_CHATBOT) || false,
   ADMIN_ACCESS: convertToBool(process.env.ADMIN_ACCESS) || false,
   PLATFORM: isHeroku
@@ -251,7 +251,7 @@ const baseConfig = {
       : process.env.AUDIO_DATA,
   TAKE_KEY: process.env.TAKE_KEY || "",
   CMD_REACTION: convertToBool(process.env.CMD_REACTION) || false,
-  MODE: process.env.MODE || "private",
+  MODE: process.env.MODE || "public",
   WARN: process.env.WARN || "4",
   ANTILINK_WARN: process.env.ANTILINK_WARN || "",
   ANTI_DELETE: convertToBool(process.env.ANTI_DELETE) || false,
@@ -406,4 +406,5 @@ Object.defineProperty(config, "debug", {
 });
 
 module.exports = config;
+
 
