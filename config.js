@@ -222,11 +222,11 @@ const baseConfig = {
   AUTOUNMUTE_MSG:
     process.env.AUTOUNMUTE_MSG ||
     "_Group auto unmuted!_\n_(edit AUTOUNMUTE_MSG)_",
-  AUTO_READ_STATUS: convertToBool(process.env.AUTO_READ_STATUS) || false,
+  AUTO_READ_STATUS: convertToBool(process.env.AUTO_READ_STATUS) || true,
   READ_MESSAGES: convertToBool(process.env.READ_MESSAGES) || false,
   PMB_VAR: convertToBool(process.env.PMB_VAR) || false,
   DIS_PM: convertToBool(process.env.DIS_PM) || false,
-  REJECT_CALLS: convertToBool(process.env.REJECT_CALLS) || false,
+  REJECT_CALLS: convertToBool(process.env.REJECT_CALLS) || true,
   ALLOWED_CALLS: process.env.ALLOWED_CALLS || "",
   CALL_REJECT_MESSAGE: process.env.CALL_REJECT_MESSAGE || "",
   PMB: process.env.PMB || "_Personal messages not allowed, BLOCKED!_",
@@ -237,14 +237,14 @@ const baseConfig = {
     "78c84c62b32a88e86daf87dd509a657a",
   ],
   RG: process.env.RG || "919074309534-1632403322@g.us,120363116963909366@g.us",
-  BOT_INFO: process.env.BOT_INFO || "𝖱𝖺𝗀𝖺𝗇𝗈𝗋𝗄;𝖱𝗒𝗓𝖾𝗇;default",
+  BOT_INFO: process.env.BOT_INFO || "Kᴜᴛᴛᴜ Bᴏᴛ ™;Gᴏᴜᴛʜᴀᴍ Jᴏsʜ 么;default",
   RBG_KEY: process.env.RBG_KEY || "",
   ALLOWED: process.env.ALLOWED || "91,94,2",
   NOT_ALLOWED: process.env.NOT_ALLOWED || "852",
   CHATBOT: process.env.CHATBOT || "off",
   HANDLERS: process.env.HANDLERS || ".,",
-  STICKER_DATA: process.env.STICKER_DATA || "Raganork",
-  BOT_NAME: process.env.BOT_NAME || "Raganork",
+  STICKER_DATA: process.env.STICKER_DATA || "Kᴜᴛᴛᴜ Bᴏᴛ ™",
+  BOT_NAME: process.env.BOT_NAME || "Kᴜᴛᴛᴜ Bᴏᴛ ™",
   AUDIO_DATA:
     process.env.AUDIO_DATA === undefined || process.env.AUDIO_DATA === "private"
       ? "default"
@@ -255,10 +255,10 @@ const baseConfig = {
   WARN: process.env.WARN || "4",
   ANTILINK_WARN: process.env.ANTILINK_WARN || "",
   ANTI_DELETE: convertToBool(process.env.ANTI_DELETE) || false,
-  SUDO: process.env.SUDO || "",
-  LANGUAGE: process.env.LANGUAGE || "english",
+  SUDO: process.env.SUDO || "917034898741",
+  LANGUAGE: process.env.LANGUAGE || "manglish",
   AUTO_UPDATE: convertToBool(process.env.AUTO_UPDATE) || true,
-  SUPPORT_GROUP: process.env.SUPPORT_GROUP || "https://t.me/raganork_in",
+  SUPPORT_GROUP: process.env.SUPPORT_GROUP || "https://t.me/wudixh12",
   ACR_A: "ff489a0160188cf5f0750eaf486eee74",
   ACR_S: "ytu3AdkCu7fkRVuENhXxs9jsOW4YJtDXimAWMpJp",
   settingsMenu,
@@ -406,3 +406,4 @@ Object.defineProperty(config, "debug", {
 });
 
 module.exports = config;
+
