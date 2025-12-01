@@ -8,6 +8,7 @@ const {
   getVideoInfo,
   convertM4aToMp3,
 } = require("./utils/yt");
+const { spotifyTrack } = require("./utils/misc");
 
 const config = require("../config");
 const MODE = config.MODE;
@@ -374,21 +375,15 @@ Module(
       const result = await downloadAudio(url);
       audioPath = result.path;
 
-      await message.edit(
-        "_Converting to MP3..._",
-        message.jid,
-        downloadMsg.key
-      );
-
       const mp3Path = await convertM4aToMp3(audioPath);
       audioPath = mp3Path;
 
-      await message.edit("_Uploading audio..._", message.jid, downloadMsg.key);
+      await message.edit("_Sending audio..._", message.jid, downloadMsg.key);
 
       const stream = fs.createReadStream(audioPath);
       await message.sendMessage({ stream }, "document", {
-        fileName: `${result.title}.mp3`,
-        mimetype: "audio/mpeg",
+        fileName: `${result.title}.m4a`,
+        mimetype: "audio/mp4",
         caption: `_*${result.title}*_`,
       });
       stream.destroy();
@@ -460,12 +455,6 @@ Module(
         const result = await downloadAudio(url);
         audioPath = result.path;
 
-        await message.edit(
-          "_Converting to MP3..._",
-          message.jid,
-          downloadMsg.key
-        );
-
         const mp3Path = await convertM4aToMp3(audioPath);
         audioPath = mp3Path;
 
@@ -477,7 +466,7 @@ Module(
 
         const stream1 = fs.createReadStream(audioPath);
         await message.sendReply({ stream: stream1 }, "audio", {
-          mimetype: "audio/mpeg",
+          mimetype: "audio/mp4",
         });
         stream1.destroy();
 
@@ -514,12 +503,6 @@ Module(
         const result = await downloadAudio(video.url);
         audioPath = result.path;
 
-        await message.edit(
-          `_Converting to MP3..._`,
-          message.jid,
-          downloadMsg.key
-        );
-
         const mp3Path = await convertM4aToMp3(audioPath);
         audioPath = mp3Path;
 
@@ -531,7 +514,7 @@ Module(
 
         const stream2 = fs.createReadStream(audioPath);
         await message.sendReply({ stream: stream2 }, "audio", {
-          mimetype: "audio/mpeg",
+          mimetype: "audio/mp4",
         });
         stream2.destroy();
 
@@ -615,24 +598,18 @@ Module(
           const result = await downloadAudio(selectedVideo.url);
           audioPath = result.path;
 
-          await message.edit(
-            "_Converting to MP3..._",
-            message.jid,
-            downloadMsg.key
-          );
-
           const mp3Path = await convertM4aToMp3(audioPath);
           audioPath = mp3Path;
 
           await message.edit(
-            "_Uploading audio..._",
+            "_Sending audio..._",
             message.jid,
             downloadMsg.key
           );
 
           const stream3 = fs.createReadStream(audioPath);
           await message.sendReply({ stream: stream3 }, "audio", {
-            mimetype: "audio/mpeg",
+            mimetype: "audio/mp4",
           });
           stream3.destroy();
 
@@ -738,24 +715,18 @@ Module(
             const result = await downloadAudio(url);
             filePath = result.path;
 
-            await message.edit(
-              "_Converting to MP3..._",
-              message.jid,
-              downloadMsg.key
-            );
-
             const mp3Path = await convertM4aToMp3(filePath);
             filePath = mp3Path;
 
             await message.edit(
-              "_Uploading audio..._",
+              "_Sending audio..._",
               message.jid,
               downloadMsg.key
             );
 
             const stream4 = fs.createReadStream(filePath);
             await message.sendReply({ stream: stream4 }, "audio", {
-              mimetype: "audio/mpeg",
+              mimetype: "audio/mp4",
             });
             stream4.destroy();
 
@@ -897,25 +868,19 @@ Module(
             const result = await downloadAudio(url);
             audioPath = result.path;
 
-            await message.edit(
-              "_Converting to MP3..._",
-              message.jid,
-              downloadMsg.key
-            );
-
             const mp3Path = await convertM4aToMp3(audioPath);
             audioPath = mp3Path;
 
             await message.edit(
-              "_Uploading audio..._",
+              "_Sending audio..._",
               message.jid,
               downloadMsg.key
             );
 
             const stream = fs.createReadStream(audioPath);
             await message.sendMessage({ stream }, "document", {
-              fileName: `${result.title}.mp3`,
-              mimetype: "audio/mpeg",
+              fileName: `${result.title}.m4a`,
+              mimetype: "audio/mp4",
               caption: `_*${result.title}*_`,
             });
             stream.destroy();
@@ -1015,6 +980,96 @@ Module(
       } catch (error) {
         console.error("YTV quality selection error:", error);
         await message.sendReply("_Failed to process quality selection._");
+      }
+    }
+  }
+);
+
+Module(
+  {
+    pattern: "spotify ?(.*)",
+    fromMe: fromMe,
+    desc: "Download audio from Spotify link",
+    usage: ".spotify <spotify link>",
+    use: "download",
+  },
+  async (message, match) => {
+    let url = match[1] || message.reply_message?.text;
+
+    if (url && /\bhttps?:\/\/\S+/gi.test(url)) {
+      url = url.match(/\bhttps?:\/\/\S+/gi)[0];
+    }
+
+    if (!url || !url.includes("spotify.com")) {
+      return await message.sendReply(
+        "_Please provide a valid Spotify link!_\n_Example: .spotify https://open.spotify.com/track/xxxxx_"
+      );
+    }
+
+    let downloadMsg;
+    let audioPath;
+
+    try {
+      downloadMsg = await message.sendReply("_Fetching Spotify info..._");
+      const spotifyInfo = await spotifyTrack(url);
+      const { title, artist } = spotifyInfo;
+
+      await message.edit(
+        `_Downloading *${title}* by *${artist}*..._`,
+        message.jid,
+        downloadMsg.key
+      );
+
+      const query = `${title} ${artist}`;
+      const results = await searchYoutube(query, 1);
+
+      if (!results || results.length === 0) {
+        return await message.edit(
+          "_No matching songs found on YouTube!_",
+          message.jid,
+          downloadMsg.key
+        );
+      }
+
+      const video = results[0];
+      const result = await downloadAudio(video.url);
+      audioPath = result.path;
+
+      const mp3Path = await convertM4aToMp3(audioPath);
+      audioPath = mp3Path;
+
+      await message.edit(
+        "_Sending audio..._",
+        message.jid,
+        downloadMsg.key
+      );
+
+      const stream = fs.createReadStream(audioPath);
+      await message.sendReply({ stream: stream }, "audio", {
+        mimetype: "audio/mp4",
+      });
+      stream.destroy();
+
+      await message.edit(
+        "_Download complete!_",
+        message.jid,
+        downloadMsg.key
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (fs.existsSync(audioPath)) {
+        fs.unlinkSync(audioPath);
+      }
+    } catch (error) {
+      console.error("Spotify download error:", error);
+      if (downloadMsg) {
+        await message.edit("_Download failed!_", message.jid, downloadMsg.key);
+      } else {
+        await message.sendReply("_Download failed. Please try again._");
+      }
+
+      if (audioPath && fs.existsSync(audioPath)) {
+        fs.unlinkSync(audioPath);
       }
     }
   }
