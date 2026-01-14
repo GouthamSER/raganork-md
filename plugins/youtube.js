@@ -262,7 +262,7 @@ Module(
   {
     pattern: "video ?(.*)",
     fromMe: fromMe,
-    desc: "Download YouTube video at 360p",
+    desc: "Download YouTube video at 720p",
     usage: ".video <link>",
     use: "download",
   },
@@ -292,7 +292,7 @@ Module(
 
     try {
       downloadMsg = await message.sendReply("_Downloading video..._");
-      const result = await downloadVideo(url, "360p");
+      const result = await downloadVideo(url, "720p");
       videoPath = result.path;
 
       await message.edit("_Uploading video..._", message.jid, downloadMsg.key);
@@ -312,7 +312,7 @@ Module(
       } else {
         const stream = fs.createReadStream(videoPath);
         await message.sendReply({ stream }, "video", {
-          caption: `_*${result.title}*_\n\n_Quality: 360p_`,
+          caption: `_*${result.title}*_\n\n_Quality: 720p_`,
         });
         stream.destroy();
       }
@@ -1074,3 +1074,4 @@ Module(
     }
   }
 );
+
